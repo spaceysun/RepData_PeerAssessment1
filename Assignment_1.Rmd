@@ -1,0 +1,187 @@
+**REPRODUCIBLE RESEARCH**
+
+**ASSIGNMENT 1**
+
+**Mar 15, 2015**
+
+# Loading and preprocessing the data
+
+## Load the data
+```{r}
+library(ggplot2)
+Sys.setlocale('LC_TIME', 'English') # Because I am using a Chinese OS.
+data <- read.csv('activity.csv', header = TRUE)
+```
+
+## Process/transform the data (if necessary) into a format suitable for your analysis
+
+All NA data are transformed into zeroes. And all values of total steps walked at any particular time-point are calculated.
+```{r}
+data$total_steps[1] = 0
+for (i in 1:nrow(data)) {
+    if (is.na(data$steps[i])) {
+        data$steps_no[i] = 0
+    } else {
+        data$steps_no[i] = data$steps[i]
+    }
+}
+for (i in 2:nrow(data)) {
+    data$total_steps[i] = data$total_steps[i-1] + data$steps_no[i]
+}
+```
+
+# What is mean total number of steps taken per day?
+
+Dates are transformed into numbers of day.
+```{r}
+for (i in 1:nrow(data)) {
+    data$day[i] = as.numeric(data$date[i])
+}
+```
+
+## Total numbers of steps per day are calculated and stored into a new dataset.
+```{r}
+total_days = max(data$day)
+daily_steps = data.frame(1:total_days)
+colnames(daily_steps) = "day"
+for (i in 1:total_days) {
+    temp_data = subset(data, day == i)
+    daily_steps$sum[i] <- sum(temp_data$steps)
+}
+```
+
+## Total numbers of steps per day are calculated.
+```{r}
+print(daily_steps)
+```
+
+## A histogram of the total number of steps taken each day is created.
+```{r}
+hist(daily_steps$sum)
+ggplot(daily_steps, aes(x = sum)) + geom_histogram()
+```
+
+## Calculating the mean and median total number of steps taken per day
+```{r}
+total_steps <- as.matrix(summary(daily_steps$sum))
+mean = total_steps[4,1]
+median = total_steps[3,1]
+```
+Mean of the total number of steps taken per day is `r mean`.
+Median of the total number of steps taken per day is `r median`.
+
+# What is the average daily activity pattern?
+
+## A time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis):
+
+Average number of steps taken across all days within 5-minute intervals is calcuated.
+```{r}
+max_interval = max(data$interval)
+interval = seq(0, max_interval, 5)
+daily_interval = data.frame(interval)
+for (i in 0:(max_interval/5)) {
+    temp_interval = subset(data, interval == i*5)
+    temp_interval$steps[is.na(temp_interval$steps)] <- 0
+    daily_interval$sum[i+1] <- sum(temp_interval$steps)
+}
+daily_interval$avg = daily_interval$sum / total_days
+```
+
+A time series plot is made.
+```{r}
+plot(x = daily_interval$interval, y = daily_interval$avg, type = 'l')
+```
+
+## Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+```{r}
+sorted <- daily_interval[order(daily_interval$avg),]
+max_day <- sorted[nrow(sorted), 1]
+```
+No. `r max_day` interval contains the maximum number of steps.
+
+
+# Imputing missing values
+
+## Calculate and report the total number of missing values in the dataset
+```{r}
+data.NA <- read.csv('activity.csv', header = TRUE)
+total_no_NA = nrow(subset(data.NA, is.na(steps)))
+```
+Total number of missing values in the dataset is `r total_no_NA`.
+
+## Devise a strategy for filling in all of the missing values in the dataset
+```{r}
+data$steps = data$steps_no
+```
+Note: Missing values have already been filled early on.
+
+## Create a new dataset that is equal to the original dataset but with the missing data filled in.
+```{r}
+new.data <- data[, 1:3]
+```
+
+## Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. 
+
+```{r}
+daily_steps_no_NA = data.frame(1:total_days)
+colnames(daily_steps_no_NA) = "day"
+for (i in 1:total_days) {
+    temp_data = subset(data, day == i)
+    daily_steps_no_NA$sum[i] <- sum(temp_data$steps)
+}
+print(daily_steps_no_NA)
+hist(daily_steps_no_NA$sum)
+summary(daily_steps_no_NA$sum)
+total_steps_no_NA <- as.matrix(summary(daily_steps_no_NA$sum))
+mean_no_NA = total_steps_no_NA[4,1]
+median_no_NA = total_steps_no_NA[3,1]
+```
+**After filling missing values:**
+Mean of the total number of steps taken per day is `r mean_no_NA`.
+Median of the total number of steps taken per day is `r median_no_NA`.
+Both are different from those obtained from original data that contains NA data.
+
+
+
+# Are there differences in activity patterns between weekdays and weekends?
+
+## Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+```{r}
+new.data$wd <- weekdays(as.Date(new.data$date, abbreviate = TRUE))
+for (i in 1:nrow(new.data)) {
+    if (new.data$wd[i] == 'Saturday' | new.data$wd[i] == 'Sunday') {
+        new.data$wd_class[i] = 'WE'
+    }
+    else {
+        new.data$wd_class[i] = 'WD'
+    }
+}
+```
+
+## Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). 
+```{r}
+new.data.WE <- subset(new.data, wd_class == 'WE')
+new.data.WD <- subset(new.data, wd_class == 'WD')
+
+new.data.WE_interval = data.frame(interval)
+for (i in 0:(max_interval/5)) {
+    temp_data_WE = subset(new.data.WE, interval == i*5)
+    new.data.WE_interval$sum[i+1] <- sum(temp_data_WE$steps)
+}
+new.data.WE_interval$avg = new.data.WE_interval$sum / total_days / 2
+
+new.data.WD_interval = data.frame(interval)
+for (i in 0:(max_interval/5)) {
+    temp_data_WD = subset(new.data.WD, interval == i*5)
+    new.data.WD_interval$sum[i+1] <- sum(temp_data_WD$steps)
+}
+new.data.WD_interval$avg = new.data.WD_interval$sum / total_days / 5
+
+par(mar = c(2, 1, 1, 1))
+par(mfrow = c(2, 1))
+
+WE <- plot(x = new.data.WE_interval$interval, y = new.data.WE_interval$avg, type = 'l')
+WD <- plot(x = new.data.WD_interval$interval, y = new.data.WD_interval$avg, type = 'l')
+```
+
+There are differences in activity patterns between weekdays and weekends.
